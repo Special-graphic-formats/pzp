@@ -4,7 +4,6 @@
 #include "pzp.h"
 //sudo apt install libzstd-dev
 
-
 int main(int argc, char *argv[])
 {
     if (argc != 4)
@@ -27,25 +26,33 @@ int main(int argc, char *argv[])
 
         image = ReadPNM(0, input_commandline_parameter, &width, &height, &timestamp, &bytesPerPixel, &channels);
         unsigned int bitsperpixel = bytesPerPixel * 8;
+        fprintf(stderr, "Width %u / Height %u / bitsperpixel %u / channels %u \n", width, height, bitsperpixel, channels);
 
-        fprintf(stderr, "Width %u / Height %u \n", width, height);
-        fprintf(stderr, "bitsperpixel %u / channels %u \n", bitsperpixel, channels);
-
-        unsigned char **buffers = malloc(channels * sizeof(unsigned char *));
-        for (unsigned int ch = 0; ch < channels; ch++)
+        if (image!=NULL)
         {
+         unsigned char **buffers = malloc(channels * sizeof(unsigned char *));
+
+         if (buffers!=NULL)
+         {
+           for (unsigned int ch = 0; ch < channels; ch++)
+           {
             buffers[ch] = malloc(width * height * sizeof(unsigned char));
-        }
+           }
 
-        split_channels_and_filter(image, buffers, channels, width, height);
-        compress_combined(buffers, width,height, bitsperpixel, channels, output_commandline_parameter);
+           split_channels_and_filter(image, buffers, channels, width, height);
 
-        free(image);
-        for (unsigned int ch = 0; ch < channels; ch++)
-        {
+           compress_combined(buffers, width,height, bitsperpixel, channels, output_commandline_parameter);
+
+         free(image);
+
+         //Deallocate intermediate buffers..
+         for (unsigned int ch = 0; ch < channels; ch++)
+          {
             free(buffers[ch]);
-        }
-        free(buffers);
+          }
+          free(buffers);
+         }
+        }//If we have an image
     }
     else if (strcmp(operation, "decompress") == 0)
     {
@@ -55,26 +62,33 @@ int main(int argc, char *argv[])
         unsigned int size = 0, width = 0, height = 0, bitsperpixel = 24, channels = 3;
 
         decompress_combined(input_commandline_parameter, &buffers, &size, &width, &height, &bitsperpixel, &channels);
+        if (buffers!=NULL)
+        {
 
         restore_channels(buffers, channels, width, height);
 
         unsigned char *reconstructed = malloc( width * height * (bitsperpixel/8)* channels );
-        for (size_t i = 0; i < width * height * (bitsperpixel/8); i++)
+        if (reconstructed!=NULL)
         {
+          for (size_t i = 0; i < width * height * (bitsperpixel/8); i++)
+          {
             for (unsigned int ch = 0; ch < channels; ch++)
             {
                 reconstructed[i * channels + ch] = buffers[ch][i];
             }
+          }
+         WritePNM(output_commandline_parameter, reconstructed, width, height, bitsperpixel, channels);
+         free(reconstructed);
         }
 
-        WritePNM(output_commandline_parameter, reconstructed, width, height, bitsperpixel, channels);
-
+        //Deallocate intermediate buffers..
         for (unsigned int ch = 0; ch < channels; ch++)
         {
             free(buffers[ch]);
         }
         free(buffers);
-        free(reconstructed);
+
+        }
     }
     else
     {

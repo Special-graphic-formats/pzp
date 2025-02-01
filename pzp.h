@@ -16,11 +16,10 @@ extern "C"
 
 #define CHUNK_SIZE 16384
 
-#define PRINT_COMMENTS 1
+#define PRINT_COMMENTS 0
 #define PPMREADBUFLEN 256
 
 static const int headerSize = sizeof(unsigned int) * 4; //width,height,bitsperpixel,channels
-
 
 static unsigned int simplePowPPM(unsigned int base,unsigned int exp)
 {
@@ -346,6 +345,7 @@ static void compress_combined(unsigned char **buffers, unsigned int width,unsign
     unsigned int size = combined_buffer_size; //width * height;
     fwrite(&size, sizeof(unsigned int), 1, output); // Store size for decompression
 
+    printf("Write size: %d bytes (including header)\n", size);
 
     size_t max_compressed_size = ZSTD_compressBound(combined_buffer_size);
     void *compressed_buffer = malloc(max_compressed_size);
@@ -411,15 +411,13 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     // Read stored size
     fread(size, sizeof(unsigned int), 1, input);
 
-    printf("Debug: Read size (raw bytes) = %02X %02X %02X %02X\n",
-           ((unsigned char*)size)[0], ((unsigned char*)size)[1],
-           ((unsigned char*)size)[2], ((unsigned char*)size)[3]);
+    //printf("Debug: Read size (raw bytes) = %02X %02X %02X %02X\n", ((unsigned char*)size)[0], ((unsigned char*)size)[1], ((unsigned char*)size)[2], ((unsigned char*)size)[3]);
     if (*size <= 0 || *size > 100000000)   // Sanity check
     {
         fprintf(stderr, "Error: Invalid size read from file (%d)\n", *size);
         exit(EXIT_FAILURE);
     }
-    printf("Read size: %d\n", *size);
+    printf("Read size: %d bytes (including header)\n", *size);
 
     // Read compressed data
     fseek(input, 0, SEEK_END);
@@ -478,7 +476,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
     for (unsigned int ch = 0; ch < *channels; ch++)
     {
-        (*buffers)[ch] = (unsigned char *)malloc(*size);
+        (*buffers)[ch] = (unsigned char *) malloc(*size);
         if (!(*buffers)[ch])
         {
             perror("Memory allocation failed");
@@ -492,7 +490,9 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     {
         for (unsigned int ch = 0; ch < *channels; ch++)
         {
-            (*buffers)[ch][i] = decompressed_bytes[i * (*channels) + ch];
+            unsigned char value = decompressed_bytes[i * (*channels) + ch];
+
+            (*buffers)[ch][i] = value;
         }
     }
 
