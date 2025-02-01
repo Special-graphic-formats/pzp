@@ -391,6 +391,7 @@ static void compress_combined(unsigned char **buffers, unsigned int width,unsign
         fprintf(stderr, "Zstd compression error: %s\n", ZSTD_getErrorName(compressed_size));
         exit(EXIT_FAILURE);
     }
+    printf("Compression Ratio : %0.2f\n", (float) size/compressed_size);
 
     fwrite(compressed_buffer, 1, compressed_size, output);
 
