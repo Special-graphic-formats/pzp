@@ -21,7 +21,7 @@ To get it :
 sudo apt install libzstd-dev
 ```
 
-To compile it PZP use :
+To compile PZP use :
 ```
 make
 ```
