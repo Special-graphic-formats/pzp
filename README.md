@@ -18,6 +18,21 @@ To get it :
 sudo apt install libzstd-dev
 ```
 
+To compile it :
+```
+make
+```
+
+To test it :
+```
+make test
+```
+
+To debug it :
+```
+make debug
+```
+
 Similar tools are [https://github.com/phoboslab/qoi](QOI) or  [https://github.com/catid/Zpng](ZPNG)
 
 
