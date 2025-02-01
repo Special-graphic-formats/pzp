@@ -10,7 +10,13 @@ png like header only image library that :
 4) Offers *some* form of compression
 5) Will hopefully be useful (to me personally) for my fast dataloader for training large neural networks 
 
-The code here is very experimental so there are no guarantees.
+The code here is very experimental so no guarantees until it reaches some maturity.
+
+The only dependency apart from a C compiler is ZSTD ( https://github.com/facebook/zstd )
+To get it :
+```
+sudo apt install libzstd-dev
+```
 
 Similar tools are [https://github.com/phoboslab/qoi](QOI) or  [https://github.com/catid/Zpng](ZPNG)
 
