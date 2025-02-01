@@ -1,20 +1,17 @@
 #!/bin/bash
 
-
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
-
+cd ..
 
 #Dependency :
 #sudo apt install libzstd-dev
 
-
-mkdir output
-
-
+#Compile
 gcc zstdInput.c -lzstd -lm -o zstdInput 
 
-
+#Test
+mkdir output
 ./pzp compress samples/sample.ppm output/sample.pzp
 ./pzp decompress output/sample.pzp output/sampleRecode.ppm 
 
