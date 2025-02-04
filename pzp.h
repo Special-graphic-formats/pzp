@@ -400,7 +400,8 @@ static void compress_combined(unsigned char **buffers, unsigned int width,unsign
     fclose(output);
 }
 
-static void decompress_combined(const char *input_filename, unsigned char ***buffers,unsigned int *size,unsigned int *width,unsigned int *height,unsigned int *bitsperpixel, unsigned int *channels)
+static void decompress_combined(const char *input_filename, unsigned char ***buffers,
+                                unsigned int *widthOutput,unsigned int *heightOutput,unsigned int *bitsperpixelOutput, unsigned int *channelsOutput)
 {
     FILE *input = fopen(input_filename, "rb");
     if (!input)
@@ -410,15 +411,16 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     }
 
     // Read stored size
-    fread(size, sizeof(unsigned int), 1, input);
+    unsigned int size;
+    fread(&size, sizeof(unsigned int), 1, input);
 
     //printf("Debug: Read size (raw bytes) = %02X %02X %02X %02X\n", ((unsigned char*)size)[0], ((unsigned char*)size)[1], ((unsigned char*)size)[2], ((unsigned char*)size)[3]);
-    if (*size <= 0 || *size > 100000000)   // Sanity check
+    if (size <= 0 || size > 100000000)   // Sanity check
     {
-        fprintf(stderr, "Error: Invalid size read from file (%d)\n", *size);
+        fprintf(stderr, "Error: Invalid size read from file (%d)\n", size);
         exit(EXIT_FAILURE);
     }
-    printf("Read size: %d bytes (including header)\n", *size);
+    printf("Read size: %d bytes (including header)\n", size);
 
     // Read compressed data
     fseek(input, 0, SEEK_END);
@@ -435,7 +437,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     fread(compressed_buffer, 1, compressed_size, input);
     fclose(input);
 
-    size_t decompressed_size = (*size);// * (*channels) + headerSize;
+    size_t decompressed_size = (size);// * (*channels) + headerSize;
     void *decompressed_buffer = malloc(decompressed_size);
     if (!decompressed_buffer)
     {
@@ -458,26 +460,32 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     unsigned int *widthSource        = bitsperpixelSource + 2; // Move by 1, not sizeof(unsigned int)
     unsigned int *heightSource       = bitsperpixelSource + 3; // Move by 1, not sizeof(unsigned int)
 
-    *bitsperpixel = *bitsperpixelSource;
-    *channels     = *channelsSource;
-    *width        = *widthSource;
-    *height       = *heightSource;
+    unsigned int bitsperpixel = *bitsperpixelSource;
+    unsigned int channels     = *channelsSource;
+    unsigned int width        = *widthSource;
+    unsigned int height       = *heightSource;
 
-    fprintf(stderr, "Detected %ux%u / %u bitsperpixel / %u channels \n", *width, *height, *bitsperpixel, *channels);
 
-    *bitsperpixel *= *channels; //This is needed because of what writePNM expects..
+    fprintf(stderr, "Detected %ux%u / %u bitsperpixel / %u channels \n", width, height, bitsperpixel, channels);
+
+    bitsperpixel *= channels; //This is needed because of what writePNM expects..
+
+    *widthOutput        = width;
+    *heightOutput       = height;
+    *bitsperpixelOutput = bitsperpixel;
+    *channelsOutput     = channels;
 
     // Allocate memory for all channels
-    *buffers = (unsigned char **)malloc(*channels * sizeof(unsigned char *));
+    *buffers = (unsigned char **)malloc(channels * sizeof(unsigned char *));
     if (!*buffers)
     {
         perror("Memory allocation failed");
         exit(EXIT_FAILURE);
     }
 
-    for (unsigned int ch = 0; ch < *channels; ch++)
+    for (unsigned int ch = 0; ch < channels; ch++)
     {
-        (*buffers)[ch] = (unsigned char *) malloc(*size);
+        (*buffers)[ch] = (unsigned char *) malloc(size);
         if (!(*buffers)[ch])
         {
             perror("Memory allocation failed");
@@ -487,11 +495,11 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
     // Copy decompressed data into the channel buffers
     unsigned char *decompressed_bytes = (unsigned char *) decompressed_buffer + headerSize;
-    for (int i = 0; i < *size; i++)
+    for (int i = 0; i < size; i++)
     {
-        for (unsigned int ch = 0; ch < *channels; ch++)
+        for (unsigned int ch = 0; ch<channels; ch++)
         {
-            unsigned char value = decompressed_bytes[i * (*channels) + ch];
+            unsigned char value = decompressed_bytes[i * (channels) + ch];
 
             (*buffers)[ch][i] = value;
         }

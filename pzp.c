@@ -36,7 +36,9 @@ int main(int argc, char *argv[])
          {
            for (unsigned int ch = 0; ch < channels; ch++)
            {
-            buffers[ch] = malloc(width * height * sizeof(unsigned char));
+             buffers[ch] = malloc(width * height * sizeof(unsigned char));
+             if (buffers[ch]!=NULL)
+               { memset(buffers[ch],0,width * height * sizeof(unsigned char)); }
            }
 
            split_channels_and_filter(image, buffers, channels, width, height);
@@ -59,9 +61,9 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Decompress %s \n", input_commandline_parameter);
 
         unsigned char **buffers = NULL;
-        unsigned int size = 0, width = 0, height = 0, bitsperpixel = 24, channels = 3;
+        unsigned int width = 0, height = 0, bitsperpixel = 24, channels = 3;
 
-        decompress_combined(input_commandline_parameter, &buffers, &size, &width, &height, &bitsperpixel, &channels);
+        decompress_combined(input_commandline_parameter, &buffers, &width, &height, &bitsperpixel, &channels);
         if (buffers!=NULL)
         {
 
