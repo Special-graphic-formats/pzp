@@ -377,6 +377,8 @@ static void compress_combined(unsigned char **buffers, unsigned int width,unsign
     *heightTarget       = height;
 
     fprintf(stderr, "Storing %ux%u / %u bitsperpixel / %u channels \n",width,height, bitsperpixel, channels);
+    //if (bitsperpixel==16)
+    //   { channels = channels * 2; }
 
     // Store separate image planes
     unsigned char *combined_buffer = combined_buffer_raw + headerSize;

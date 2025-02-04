@@ -28,22 +28,29 @@ int main(int argc, char *argv[])
         unsigned int bitsperpixel = bytesPerPixel * 8;
         fprintf(stderr, "Width %u / Height %u / bitsperpixel %u / channels %u \n", width, height, bitsperpixel, channels);
 
+        unsigned int channelsPlusEmulated = channels;
+        /*
+        if (bitsperpixel==16)
+        {
+            channelsPlusEmulated*=2;
+        }*/
+
         if (image!=NULL)
         {
-         unsigned char **buffers = malloc(channels * sizeof(unsigned char *));
+         unsigned char **buffers = malloc(channelsPlusEmulated * sizeof(unsigned char *));
 
          if (buffers!=NULL)
          {
-           for (unsigned int ch = 0; ch < channels; ch++)
+           for (unsigned int ch = 0; ch < channelsPlusEmulated; ch++)
            {
              buffers[ch] = malloc(width * height * sizeof(unsigned char));
-             if (buffers[ch]!=NULL)
-               { memset(buffers[ch],0,width * height * sizeof(unsigned char)); }
+             //if (buffers[ch]!=NULL)
+             //{ memset(buffers[ch],0,width * height * sizeof(unsigned char)); }
            }
 
-           split_channels_and_filter(image, buffers, channels, width, height);
+           split_channels_and_filter(image, buffers, channelsPlusEmulated, width, height);
 
-           compress_combined(buffers, width,height, bitsperpixel, channels, output_commandline_parameter);
+           compress_combined(buffers, width,height, bitsperpixel, channelsPlusEmulated, output_commandline_parameter);
 
          free(image);
 
@@ -72,7 +79,7 @@ int main(int argc, char *argv[])
         unsigned char *reconstructed = malloc( width * height * (bitsperpixel/8)* channels );
         if (reconstructed!=NULL)
         {
-          for (size_t i = 0; i < width * height ; i++) //* (bitsperpixel/8)
+          for (size_t i = 0; i < width * height; i++) //* (bitsperpixel/8)
           {
             for (unsigned int ch = 0; ch < channels; ch++)
             {
