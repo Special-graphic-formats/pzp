@@ -505,7 +505,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
     // Copy decompressed data into the channel buffers
     unsigned char *decompressed_bytes = (unsigned char *) decompressed_buffer + headerSize;
-    for (int i = 0; i < dataSize; i++)
+    for (int i = 0; i < width*height; i++)
     {
         for (unsigned int ch = 0; ch<channels; ch++)
         {

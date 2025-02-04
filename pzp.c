@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
         unsigned char *reconstructed = malloc( width * height * (bitsperpixel/8)* channels );
         if (reconstructed!=NULL)
         {
-          for (size_t i = 0; i < width * height * (bitsperpixel/8); i++)
+          for (size_t i = 0; i < width * height ; i++) //* (bitsperpixel/8)
           {
             for (unsigned int ch = 0; ch < channels; ch++)
             {
