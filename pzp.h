@@ -14,6 +14,8 @@ extern "C"
 #include <zstd.h>
 //sudo apt install libzstd-dev
 
+
+
 #define CHUNK_SIZE 16384
 
 #define PRINT_COMMENTS 0
@@ -342,10 +344,10 @@ static void compress_combined(unsigned char **buffers, unsigned int width,unsign
 
     unsigned int combined_buffer_size = (width * height * (bitsperpixel/8)* channels) + headerSize;
 
-    unsigned int size = combined_buffer_size; //width * height;
-    fwrite(&size, sizeof(unsigned int), 1, output); // Store size for decompression
+    unsigned int dataSize = combined_buffer_size;       //width * height;
+    fwrite(&dataSize, sizeof(unsigned int), 1, output); // Store size for decompression
 
-    printf("Write size: %d bytes (including header)\n", size);
+    printf("Write size: %d bytes (including header)\n", dataSize);
 
     size_t max_compressed_size = ZSTD_compressBound(combined_buffer_size);
     void *compressed_buffer = malloc(max_compressed_size);
@@ -368,6 +370,7 @@ static void compress_combined(unsigned char **buffers, unsigned int width,unsign
     unsigned int *widthTarget        = bitsperpixelTarget + 2; // Move by 1, not sizeof(unsigned int)
     unsigned int *heightTarget       = bitsperpixelTarget + 3; // Move by 1, not sizeof(unsigned int)
 
+    //Store data to their target location
     *bitsperpixelTarget = bitsperpixel;
     *channelsTarget     = channels;
     *widthTarget        = width;
@@ -391,7 +394,7 @@ static void compress_combined(unsigned char **buffers, unsigned int width,unsign
         fprintf(stderr, "Zstd compression error: %s\n", ZSTD_getErrorName(compressed_size));
         exit(EXIT_FAILURE);
     }
-    printf("Compression Ratio : %0.2f\n", (float) size/compressed_size);
+    printf("Compression Ratio : %0.2f\n", (float) dataSize/compressed_size);
 
     fwrite(compressed_buffer, 1, compressed_size, output);
 
@@ -411,16 +414,15 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     }
 
     // Read stored size
-    unsigned int size;
-    fread(&size, sizeof(unsigned int), 1, input);
+    unsigned int dataSize;
+    fread(&dataSize, sizeof(unsigned int), 1, input);
 
-    //printf("Debug: Read size (raw bytes) = %02X %02X %02X %02X\n", ((unsigned char*)size)[0], ((unsigned char*)size)[1], ((unsigned char*)size)[2], ((unsigned char*)size)[3]);
-    if (size <= 0 || size > 100000000)   // Sanity check
+    if (dataSize <= 0 || dataSize > 100000000)   // Sanity check
     {
-        fprintf(stderr, "Error: Invalid size read from file (%d)\n", size);
+        fprintf(stderr, "Error: Invalid size read from file (%d)\n", dataSize);
         exit(EXIT_FAILURE);
     }
-    printf("Read size: %d bytes (including header)\n", size);
+    printf("Read size: %d bytes (including header)\n", dataSize);
 
     // Read compressed data
     fseek(input, 0, SEEK_END);
@@ -437,7 +439,8 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     fread(compressed_buffer, 1, compressed_size, input);
     fclose(input);
 
-    size_t decompressed_size = (size);// * (*channels) + headerSize;
+    size_t decompressed_size = (size_t) dataSize;
+
     void *decompressed_buffer = malloc(decompressed_size);
     if (!decompressed_buffer)
     {
@@ -453,6 +456,13 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     }
 
     free(compressed_buffer);
+
+    if (actual_decompressed_size!=decompressed_size)
+    {
+      fprintf(stderr, "Actual Decompressed size %lu mismatch with Decompressed size %lu \n", actual_decompressed_size, decompressed_size);
+      exit(EXIT_FAILURE);
+    }
+
 
     // Read header information
     unsigned int *bitsperpixelSource = (unsigned int *) decompressed_buffer;
@@ -485,7 +495,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
     for (unsigned int ch = 0; ch < channels; ch++)
     {
-        (*buffers)[ch] = (unsigned char *) malloc(size);
+        (*buffers)[ch] = (unsigned char *) malloc(dataSize);
         if (!(*buffers)[ch])
         {
             perror("Memory allocation failed");
@@ -495,7 +505,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
     // Copy decompressed data into the channel buffers
     unsigned char *decompressed_bytes = (unsigned char *) decompressed_buffer + headerSize;
-    for (int i = 0; i < size; i++)
+    for (int i = 0; i < dataSize; i++)
     {
         for (unsigned int ch = 0; ch<channels; ch++)
         {
