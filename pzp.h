@@ -332,7 +332,7 @@ static void restore_channels(unsigned char **buffers, int num_buffers, int WIDTH
 
 static void compress_combined(unsigned char **buffers,
                               unsigned int width,unsigned int height,
-                              unsigned int bitsperpixel, unsigned int channels,
+                              unsigned int bitsperpixelExternal, unsigned int channelsExternal,
                               unsigned int bitsperpixelInternal, unsigned int channelsInternal,
                               const char *output_filename)
 {
@@ -343,7 +343,7 @@ static void compress_combined(unsigned char **buffers,
         exit(EXIT_FAILURE);
     }
 
-    unsigned int combined_buffer_size = (width * height * (bitsperpixel/8)* channels) + headerSize;
+    unsigned int combined_buffer_size = (width * height * (bitsperpixelInternal/8)* channelsInternal) + headerSize;
 
     unsigned int dataSize = combined_buffer_size;       //width * height;
     fwrite(&dataSize, sizeof(unsigned int), 1, output); // Store size for decompression
@@ -374,24 +374,23 @@ static void compress_combined(unsigned char **buffers,
     unsigned int *channelsInternalTarget     = bitsperpixelTarget + 5; // Move by 1, not sizeof(unsigned int)
 
     //Store data to their target location
-    *bitsperpixelTarget = bitsperpixel;
-    *channelsTarget     = channels;
+    *bitsperpixelTarget = bitsperpixelExternal;
+    *channelsTarget     = channelsExternal;
     *widthTarget        = width;
     *heightTarget       = height;
     *bitsperpixelInternalTarget = bitsperpixelInternal;
     *channelsInternalTarget     = channelsInternal;
 
-    fprintf(stderr, "Storing %ux%u / %u bitsperpixel / %u channels \n",width,height, bitsperpixel, channels);
-    //if (bitsperpixel==16)
-    //   { channels = channels * 2; }
+    fprintf(stderr, "Storing %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExternal, channelsExternal);
+    fprintf(stderr, "%u In:bitsperpixel / %u In:channels \n",bitsperpixelInternal, channelsInternal);
 
     // Store separate image planes
     unsigned char *combined_buffer = combined_buffer_raw + headerSize;
     for (int i = 0; i < width*height; i++)
     {
-        for (unsigned int ch = 0; ch < channels; ch++)
+        for (unsigned int ch = 0; ch < channelsInternal; ch++)
         {
-            combined_buffer[i * channels + ch] = buffers[ch][i];
+            combined_buffer[i * channelsInternal + ch] = buffers[ch][i];
         }
     }
 
@@ -411,7 +410,10 @@ static void compress_combined(unsigned char **buffers,
 }
 
 static void decompress_combined(const char *input_filename, unsigned char ***buffers,
-                                unsigned int *widthOutput,unsigned int *heightOutput,unsigned int *bitsperpixelOutput, unsigned int *channelsOutput)
+                                unsigned int *widthOutput,unsigned int *heightOutput,
+                                unsigned int *bitsperpixelExternalOutput, unsigned int *channelsExternalOutput,
+                                unsigned int *bitsperpixelInternalOutput, unsigned int *channelsInternalOutput
+                                )
 {
     FILE *input = fopen(input_filename, "rb");
     if (!input)
@@ -472,35 +474,45 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
 
     // Read header information
-    unsigned int *bitsperpixelSource = (unsigned int *) decompressed_buffer;
-    unsigned int *channelsSource     = bitsperpixelSource + 1; // Move by 1, not sizeof(unsigned int)
-    unsigned int *widthSource        = bitsperpixelSource + 2; // Move by 1, not sizeof(unsigned int)
-    unsigned int *heightSource       = bitsperpixelSource + 3; // Move by 1, not sizeof(unsigned int)
+    unsigned int *memStartAsUINT = (unsigned int *) decompressed_buffer;
+    unsigned int *bitsperpixelExtSource = memStartAsUINT + 0;
+    unsigned int *channelsExtSource     = memStartAsUINT + 1; // Move by 1, not sizeof(unsigned int)
+    unsigned int *widthSource           = memStartAsUINT + 2; // Move by 1, not sizeof(unsigned int)
+    unsigned int *heightSource          = memStartAsUINT + 3; // Move by 1, not sizeof(unsigned int)
+    unsigned int *bitsperpixelInSource  = memStartAsUINT + 4;
+    unsigned int *channelsInSource      = memStartAsUINT + 5; // Move by 1, not sizeof(unsigned int)
 
-    unsigned int bitsperpixel = *bitsperpixelSource;
-    unsigned int channels     = *channelsSource;
-    unsigned int width        = *widthSource;
-    unsigned int height       = *heightSource;
+    //Move from ampped header memory to our local variables
+    unsigned int bitsperpixelExt = *bitsperpixelExtSource;
+    unsigned int channelsExt     = *channelsExtSource;
+    unsigned int width           = *widthSource;
+    unsigned int height          = *heightSource;
+    unsigned int bitsperpixelIn  = *bitsperpixelInSource;
+    unsigned int channelsIn      = *channelsInSource;
 
 
-    fprintf(stderr, "Detected %ux%u / %u bitsperpixel / %u channels \n", width, height, bitsperpixel, channels);
+    fprintf(stderr, "Detected %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExt, channelsExt);
+    fprintf(stderr, "%u In:bitsperpixel / %u In:channels \n",bitsperpixelIn, channelsIn);
 
-    bitsperpixel *= channels; //This is needed because of what writePNM expects..
+    //bitsperpixel *= channels; //This is needed because of what writePNM expects..
 
-    *widthOutput        = width;
-    *heightOutput       = height;
-    *bitsperpixelOutput = bitsperpixel;
-    *channelsOutput     = channels;
+    //Move from our local variables to function output
+    *bitsperpixelExternalOutput = bitsperpixelExt;
+    *channelsExternalOutput     = channelsExt;
+    *widthOutput                = width;
+    *heightOutput               = height;
+    *bitsperpixelInternalOutput = bitsperpixelIn;
+    *channelsInternalOutput     = channelsIn;
 
     // Allocate memory for all channels
-    *buffers = (unsigned char **)malloc(channels * sizeof(unsigned char *));
+    *buffers = (unsigned char **) malloc(channelsIn * sizeof(unsigned char *));
     if (!*buffers)
     {
         perror("Memory allocation failed");
         exit(EXIT_FAILURE);
     }
 
-    for (unsigned int ch = 0; ch < channels; ch++)
+    for (unsigned int ch = 0; ch < channelsIn; ch++)
     {
         (*buffers)[ch] = (unsigned char *) malloc(dataSize);
         if (!(*buffers)[ch])
@@ -514,9 +526,9 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     unsigned char *decompressed_bytes = (unsigned char *) decompressed_buffer + headerSize;
     for (int i = 0; i < width*height; i++)
     {
-        for (unsigned int ch = 0; ch<channels; ch++)
+        for (unsigned int ch = 0; ch<channelsIn; ch++)
         {
-            unsigned char value = decompressed_bytes[i * (channels) + ch];
+            unsigned char value = decompressed_bytes[i * (channelsIn) + ch];
 
             (*buffers)[ch][i] = value;
         }

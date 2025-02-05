@@ -30,11 +30,13 @@ int main(int argc, char *argv[])
 
         bitsperpixelInternal = bitsperpixel;
         channelsInternal     = channels;
-        /*
+
         if (bitsperpixel==16)
         {
+            //having one channel of 16bit is the same as having 2 channels of 8 bit
+            bitsperpixelInternal = 8;
             channelsInternal*=2;
-        }*/
+        }
 
         if (image!=NULL)
         {
@@ -69,30 +71,36 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Decompress %s \n", input_commandline_parameter);
 
         unsigned char **buffers = NULL;
-        unsigned int width = 0, height = 0, bitsperpixel = 24, channels = 3;
+        unsigned int width = 0, height = 0;
+        unsigned int bitsperpixelExternal = 0, channelsExternal = 3;
+        unsigned int bitsperpixelInternal = 24, channelsInternal = 3;
 
-        decompress_combined(input_commandline_parameter, &buffers, &width, &height, &bitsperpixel, &channels);
+        decompress_combined(input_commandline_parameter, &buffers, &width, &height,
+                            &bitsperpixelExternal, &channelsExternal,
+                            &bitsperpixelInternal, &channelsInternal);
         if (buffers!=NULL)
         {
 
-        restore_channels(buffers, channels, width, height);
+        restore_channels(buffers, channelsInternal, width, height);
 
-        unsigned char *reconstructed = malloc( width * height * (bitsperpixel/8)* channels );
+        unsigned char *reconstructed = malloc( width * height * (bitsperpixelInternal/8)* channelsInternal );
         if (reconstructed!=NULL)
         {
           for (size_t i = 0; i < width * height; i++) //* (bitsperpixel/8)
           {
-            for (unsigned int ch = 0; ch < channels; ch++)
+            for (unsigned int ch = 0; ch < channelsInternal; ch++)
             {
-                reconstructed[i * channels + ch] = buffers[ch][i];
+                reconstructed[i * channelsInternal + ch] = buffers[ch][i];
             }
           }
-         WritePNM(output_commandline_parameter, reconstructed, width, height, bitsperpixel, channels);
+
+         bitsperpixelExternal *= channelsExternal; //This is needed because of what writePNM expects..
+         WritePNM(output_commandline_parameter, reconstructed, width, height, bitsperpixelExternal, channelsExternal);
          free(reconstructed);
         }
 
         //Deallocate intermediate buffers..
-        for (unsigned int ch = 0; ch < channels; ch++)
+        for (unsigned int ch = 0; ch < channelsInternal; ch++)
         {
             free(buffers[ch]);
         }
