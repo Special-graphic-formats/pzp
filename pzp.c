@@ -21,36 +21,37 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Compress %s \n", input_commandline_parameter);
 
         unsigned char *image = NULL;
-        unsigned int width = 0, height = 0, bytesPerPixel = 0, channels = 0;
+        unsigned int width = 0, height = 0, bytesPerPixel = 0, channels = 0, bitsperpixelInternal = 0, channelsInternal=0;
         unsigned long timestamp = 0;
 
         image = ReadPNM(0, input_commandline_parameter, &width, &height, &timestamp, &bytesPerPixel, &channels);
         unsigned int bitsperpixel = bytesPerPixel * 8;
         fprintf(stderr, "Width %u / Height %u / bitsperpixel %u / channels %u \n", width, height, bitsperpixel, channels);
 
-        unsigned int channelsPlusEmulated = channels;
+        bitsperpixelInternal = bitsperpixel;
+        channelsInternal     = channels;
         /*
         if (bitsperpixel==16)
         {
-            channelsPlusEmulated*=2;
+            channelsInternal*=2;
         }*/
 
         if (image!=NULL)
         {
-         unsigned char **buffers = malloc(channelsPlusEmulated * sizeof(unsigned char *));
+         unsigned char **buffers = malloc(channelsInternal * sizeof(unsigned char *));
 
          if (buffers!=NULL)
          {
-           for (unsigned int ch = 0; ch < channelsPlusEmulated; ch++)
+           for (unsigned int ch = 0; ch < channelsInternal; ch++)
            {
              buffers[ch] = malloc(width * height * sizeof(unsigned char));
              //if (buffers[ch]!=NULL)
              //{ memset(buffers[ch],0,width * height * sizeof(unsigned char)); }
            }
 
-           split_channels_and_filter(image, buffers, channelsPlusEmulated, width, height);
+           split_channels_and_filter(image, buffers, channelsInternal, width, height);
 
-           compress_combined(buffers, width,height, bitsperpixel, channelsPlusEmulated, output_commandline_parameter);
+           compress_combined(buffers, width,height, bitsperpixel,channels, bitsperpixelInternal, channelsInternal, output_commandline_parameter );
 
          free(image);
 

@@ -21,7 +21,7 @@ extern "C"
 #define PRINT_COMMENTS 0
 #define PPMREADBUFLEN 256
 
-static const int headerSize = sizeof(unsigned int) * 4; //width,height,bitsperpixel,channels
+static const int headerSize = sizeof(unsigned int) * 6; //width,height,bitsperpixel,channels, internalbitsperpixel, internalchannels
 
 static unsigned int simplePowPPM(unsigned int base,unsigned int exp)
 {
@@ -169,7 +169,6 @@ static unsigned char * ReadPNM(unsigned char * buffer,const char * filename,unsi
             return buffer;
         }
 
-
         //This is a super ninja hackish patch that fixes the case where fscanf eats one character more on the stream
         //It could be done better  ( no need to fseek ) but this will have to do for now
         //Scan for border case
@@ -242,7 +241,6 @@ static unsigned char * ReadPNM(unsigned char * buffer,const char * filename,unsi
     return buffer;
 }
 
-
 static int WritePNM(const char * filename, unsigned char * pixels, unsigned int width, unsigned int height, unsigned int bitsperpixel, unsigned int channels)
 {
     if ((width == 0) || (height == 0) || (channels == 0) || (bitsperpixel == 0))
@@ -297,7 +295,6 @@ static int WritePNM(const char * filename, unsigned char * pixels, unsigned int 
     return 0;
 }
 
-
 static void split_channels_and_filter(const unsigned char *image, unsigned char **buffers, int num_buffers, int WIDTH, int HEIGHT)
 {
     int total_size = WIDTH * HEIGHT;
@@ -332,7 +329,12 @@ static void restore_channels(unsigned char **buffers, int num_buffers, int WIDTH
         }
     }
 }
-static void compress_combined(unsigned char **buffers, unsigned int width,unsigned int height, unsigned int bitsperpixel, unsigned int channels, const char *output_filename)
+
+static void compress_combined(unsigned char **buffers,
+                              unsigned int width,unsigned int height,
+                              unsigned int bitsperpixel, unsigned int channels,
+                              unsigned int bitsperpixelInternal, unsigned int channelsInternal,
+                              const char *output_filename)
 {
     FILE *output = fopen(output_filename, "wb");
     if (!output)
@@ -340,7 +342,6 @@ static void compress_combined(unsigned char **buffers, unsigned int width,unsign
         perror("File error");
         exit(EXIT_FAILURE);
     }
-
 
     unsigned int combined_buffer_size = (width * height * (bitsperpixel/8)* channels) + headerSize;
 
@@ -365,16 +366,20 @@ static void compress_combined(unsigned char **buffers, unsigned int width,unsign
     }
 
     // Store header information
-    unsigned int *bitsperpixelTarget = (unsigned int*) combined_buffer_raw;
-    unsigned int *channelsTarget     = bitsperpixelTarget + 1; // Move by 1, not sizeof(unsigned int)
-    unsigned int *widthTarget        = bitsperpixelTarget + 2; // Move by 1, not sizeof(unsigned int)
-    unsigned int *heightTarget       = bitsperpixelTarget + 3; // Move by 1, not sizeof(unsigned int)
+    unsigned int *bitsperpixelTarget  = (unsigned int*) combined_buffer_raw;
+    unsigned int *channelsTarget      = bitsperpixelTarget + 1; // Move by 1, not sizeof(unsigned int)
+    unsigned int *widthTarget         = bitsperpixelTarget + 2; // Move by 1, not sizeof(unsigned int)
+    unsigned int *heightTarget        = bitsperpixelTarget + 3; // Move by 1, not sizeof(unsigned int)
+    unsigned int *bitsperpixelInternalTarget = bitsperpixelTarget + 4; // Move by 1, not sizeof(unsigned int)
+    unsigned int *channelsInternalTarget     = bitsperpixelTarget + 5; // Move by 1, not sizeof(unsigned int)
 
     //Store data to their target location
     *bitsperpixelTarget = bitsperpixel;
     *channelsTarget     = channels;
     *widthTarget        = width;
     *heightTarget       = height;
+    *bitsperpixelInternalTarget = bitsperpixelInternal;
+    *channelsInternalTarget     = channelsInternal;
 
     fprintf(stderr, "Storing %ux%u / %u bitsperpixel / %u channels \n",width,height, bitsperpixel, channels);
     //if (bitsperpixel==16)
