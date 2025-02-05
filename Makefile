@@ -26,15 +26,16 @@ $(OUTDIR):
 test: all $(OUTDIR)
 	./$(PZP) compress samples/sample.ppm $(OUTDIR)/sample.pzp
 	./$(PZP) decompress $(OUTDIR)/sample.pzp $(OUTDIR)/sampleRecode.ppm
-
+	#diff samples/sample.ppm $(OUTDIR)/sampleRecode.ppm 
 	./$(PZP) compress samples/depth16.pnm $(OUTDIR)/depth16.pzp
 	./$(PZP) decompress $(OUTDIR)/depth16.pzp $(OUTDIR)/depth16Recode.ppm
-
+	#diff samples/depth16.pnm $(OUTDIR)/depth16Recode.ppm 
 	./$(PZP) compress samples/rgb8.pnm $(OUTDIR)/rgb8.pzp
 	./$(PZP) decompress $(OUTDIR)/rgb8.pzp $(OUTDIR)/rgb8Recode.ppm
-
+	#diff samples/rgb8.pnm $(OUTDIR)/rgb8Recode.ppm
 	./$(PZP) compress samples/segment.ppm $(OUTDIR)/segment.pzp
 	./$(PZP) decompress $(OUTDIR)/segment.pzp $(OUTDIR)/segmentRecode.ppm
+	#diff samples/segment.pnm $(OUTDIR)/segmentRecode.ppm
 
 
 debug: all $(OUTDIR)
