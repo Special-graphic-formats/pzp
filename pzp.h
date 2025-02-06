@@ -423,8 +423,6 @@ static void compress_combined(unsigned char **buffers,
     *bitsperpixelInternalTarget = bitsperpixelInternal;
     *channelsInternalTarget     = channelsInternal;
 
-    fprintf(stderr, "Storing %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExternal, channelsExternal);
-    fprintf(stderr, "%u In:bitsperpixel / %u In:channels \n",bitsperpixelInternal, channelsInternal);
 
 
     // Store separate image planes
@@ -437,8 +435,12 @@ static void compress_combined(unsigned char **buffers,
         }
     }
 
-
     *checksumTarget = hash_checksum(combined_buffer,width*height*channelsInternal);
+
+    fprintf(stderr, "Storing %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExternal, channelsExternal);
+    fprintf(stderr, "%u In:bitsperpixel / %u In:channels ",bitsperpixelInternal, channelsInternal);
+    fprintf(stderr, " / 0x%X checksum \n",*checksumTarget);
+
 
     size_t compressed_size = ZSTD_compress(compressed_buffer, max_compressed_size, combined_buffer_raw, combined_buffer_size, 1);
     if (ZSTD_isError(compressed_size))
@@ -544,7 +546,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
     fprintf(stderr, "Detected %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExt, channelsExt);
     fprintf(stderr, "%u In:bitsperpixel / %u In:channels  ",bitsperpixelIn, channelsIn);
-    fprintf(stderr, " / %u checksum \n",*checksumSource);
+    fprintf(stderr, " / 0x%X checksum \n",*checksumSource);
 
     //Move from our local variables to function output
     *bitsperpixelExternalOutput = bitsperpixelExt;
