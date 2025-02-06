@@ -1,6 +1,9 @@
 # PZP
 Portable Zipped PNM
 
+
+### Overview
+
 This is an experimental project to create a minimal
 PNG like header only image library that :
 

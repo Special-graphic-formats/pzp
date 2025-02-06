@@ -465,10 +465,9 @@ static void compress_combined(unsigned char **buffers,
 }
 
 static void decompress_combined(const char *input_filename, unsigned char ***buffers,
-                                unsigned int *widthOutput,unsigned int *heightOutput,
+                                unsigned int *widthOutput, unsigned int *heightOutput,
                                 unsigned int *bitsperpixelExternalOutput, unsigned int *channelsExternalOutput,
-                                unsigned int *bitsperpixelInternalOutput, unsigned int *channelsInternalOutput
-                                )
+                                unsigned int *bitsperpixelInternalOutput, unsigned int *channelsInternalOutput)
 {
     FILE *input = fopen(input_filename, "rb");
     if (!input)
@@ -478,68 +477,97 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
     // Read stored size
     unsigned int dataSize;
-    fread(&dataSize, sizeof(unsigned int), 1, input);
-
-    if (dataSize <= 0 || dataSize > 100000000)   // Sanity check
+    if (fread(&dataSize, sizeof(unsigned int), 1, input) != 1)
     {
+        fclose(input);
+        fail("Failed to read data size");
+    }
+
+    if (dataSize == 0 || dataSize > 100000000)   // Sanity check
+    {
+        fclose(input);
         fprintf(stderr, "Error: Invalid size read from file (%d)\n", dataSize);
         exit(EXIT_FAILURE);
     }
     printf("Read size: %d bytes\n", dataSize);
 
     // Read compressed data
-    fseek(input, 0, SEEK_END);
-    size_t compressed_size = ftell(input) - sizeof(int);
-    fseek(input, sizeof(int), SEEK_SET);
+    if (fseek(input, 0, SEEK_END) != 0)
+    {
+        fclose(input);
+        fail("Failed to seek file end");
+    }
+
+    long fileSize = ftell(input);
+    if (fileSize < 0)
+    {
+        fclose(input);
+        fail("Failed to determine file size");
+    }
+
+    size_t compressed_size = fileSize - sizeof(unsigned int);
+
+    if (fseek(input, sizeof(unsigned int), SEEK_SET) != 0)
+    {
+        fclose(input);
+        fail("Failed to seek to compressed data");
+    }
 
     void *compressed_buffer = malloc(compressed_size);
     if (!compressed_buffer)
     {
+        fclose(input);
         fail("Memory allocation #1 failed");
     }
 
-    fread(compressed_buffer, 1, compressed_size, input);
+    if (fread(compressed_buffer, 1, compressed_size, input) != compressed_size)
+    {
+        free(compressed_buffer);
+        fclose(input);
+        fail("Failed to read compressed data");
+    }
+
     fclose(input);
 
-    size_t decompressed_size = (size_t) dataSize;
-
+    size_t decompressed_size = (size_t)dataSize;
     void *decompressed_buffer = malloc(decompressed_size);
     if (!decompressed_buffer)
     {
+        free(compressed_buffer);
         fail("Memory allocation #2 failed");
     }
 
     size_t actual_decompressed_size = ZSTD_decompress(decompressed_buffer, decompressed_size, compressed_buffer, compressed_size);
     if (ZSTD_isError(actual_decompressed_size))
     {
+        free(compressed_buffer);
+        free(decompressed_buffer);
         fprintf(stderr, "Zstd decompression error: %s\n", ZSTD_getErrorName(actual_decompressed_size));
         fail("Decompression Error");
     }
 
     free(compressed_buffer);
 
-    if (actual_decompressed_size!=decompressed_size)
+    if (actual_decompressed_size != decompressed_size)
     {
-      fprintf(stderr, "Actual Decompressed size %lu mismatch with Decompressed size %lu \n", actual_decompressed_size, decompressed_size);
-      fail("Decompression Error");
+        free(decompressed_buffer);
+        fprintf(stderr, "Actual Decompressed size %lu mismatch with Decompressed size %lu \n", actual_decompressed_size, decompressed_size);
+        fail("Decompression Error");
     }
 
-
     // Read header information
-    //---------------------------------------------------------------------------------------------------
-    unsigned int *memStartAsUINT = (unsigned int *) decompressed_buffer;
-    //---------------------------------------------------------------------------------------------------
-    unsigned int *headerSource          = memStartAsUINT + 0;
-    unsigned int *bitsperpixelExtSource = memStartAsUINT + 1; // Move by 1, not sizeof(unsigned int)
-    unsigned int *channelsExtSource     = memStartAsUINT + 2; // Move by 1, not sizeof(unsigned int)
-    unsigned int *widthSource           = memStartAsUINT + 3; // Move by 1, not sizeof(unsigned int)
-    unsigned int *heightSource          = memStartAsUINT + 4; // Move by 1, not sizeof(unsigned int)
-    unsigned int *bitsperpixelInSource  = memStartAsUINT + 5; // Move by 1, not sizeof(unsigned int)
-    unsigned int *channelsInSource      = memStartAsUINT + 6; // Move by 1, not sizeof(unsigned int)
-    unsigned int *checksumSource        = memStartAsUINT + 7; // Move by 1, not sizeof(unsigned int)
-    //---------------------------------------------------------------------------------------------------
+    unsigned int *memStartAsUINT = (unsigned int *)decompressed_buffer;
 
-    //Move from ampped header memory to our local variables
+    unsigned int *headerSource          = memStartAsUINT + 0;
+    unsigned int *bitsperpixelExtSource = memStartAsUINT + 1;
+    unsigned int *channelsExtSource     = memStartAsUINT + 2;
+    unsigned int *widthSource           = memStartAsUINT + 3;
+    unsigned int *heightSource          = memStartAsUINT + 4;
+    unsigned int *bitsperpixelInSource  = memStartAsUINT + 5;
+    unsigned int *channelsInSource      = memStartAsUINT + 6;
+    unsigned int *checksumSource        = memStartAsUINT + 7;
+
+    // Move from mapped header memory to our local variables
     unsigned int bitsperpixelExt = *bitsperpixelExtSource;
     unsigned int channelsExt     = *channelsExtSource;
     unsigned int width           = *widthSource;
@@ -547,19 +575,20 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     unsigned int bitsperpixelIn  = *bitsperpixelInSource;
     unsigned int channelsIn      = *channelsInSource;
 
-    #if PZP_VERBOSE
-    fprintf(stderr, "Detected %ux%ux%u@%ubit/",width,height,channelsExt,bitsperpixelExt);
-    fprintf(stderr, "%u@%ubit",channelsIn,bitsperpixelIn);
-    fprintf(stderr, " | 0x%X checksum \n",*checksumSource);
-    #endif // PZP_VERBOSE
+#if PZP_VERBOSE
+    fprintf(stderr, "Detected %ux%ux%u@%ubit/", width, height, channelsExt, bitsperpixelExt);
+    fprintf(stderr, "%u@%ubit", channelsIn, bitsperpixelIn);
+    fprintf(stderr, " | 0x%X checksum \n", *checksumSource);
+#endif
 
     unsigned int runtimeVersion = convert_header(pzp_header);
-    if (runtimeVersion!=*headerSource)
+    if (runtimeVersion != *headerSource)
     {
+        free(decompressed_buffer);
         fail("PZP version mismatch stopping to ensure consistency..");
     }
 
-    //Move from our local variables to function output
+    // Move from our local variables to function output
     *bitsperpixelExternalOutput = bitsperpixelExt;
     *channelsExternalOutput     = channelsExt;
     *widthOutput                = width;
@@ -568,35 +597,41 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     *channelsInternalOutput     = channelsIn;
 
     // Allocate memory for all channels
-    *buffers = (unsigned char **) malloc(channelsIn * sizeof(unsigned char *));
+    *buffers = (unsigned char **)malloc(channelsIn * sizeof(unsigned char *));
     if (!*buffers)
     {
+        free(decompressed_buffer);
         fail("Memory allocation failed");
     }
 
     for (unsigned int ch = 0; ch < channelsIn; ch++)
     {
-        (*buffers)[ch] = (unsigned char *) malloc(dataSize);
+        (*buffers)[ch] = (unsigned char *)malloc(dataSize);
         if (!(*buffers)[ch])
         {
+            for (unsigned int i = 0; i < ch; i++)
+            {
+                free((*buffers)[i]);  // Free previously allocated channels
+            }
+            free(*buffers);
+            free(decompressed_buffer);
             fail("Memory allocation failed");
         }
     }
 
     // Copy decompressed data into the channel buffers
-    unsigned char *decompressed_bytes = (unsigned char *) decompressed_buffer + headerSize;
-    for (int i = 0; i < width*height; i++)
+    unsigned char *decompressed_bytes = (unsigned char *)decompressed_buffer + headerSize;
+    for (int i = 0; i < width * height; i++)
     {
-        for (unsigned int ch = 0; ch<channelsIn; ch++)
+        for (unsigned int ch = 0; ch < channelsIn; ch++)
         {
-            unsigned char value = decompressed_bytes[i * (channelsIn) + ch];
-
-            (*buffers)[ch][i] = value;
+            (*buffers)[ch][i] = decompressed_bytes[i * channelsIn + ch];
         }
     }
 
     free(decompressed_buffer);
 }
+
 
 #ifdef __cplusplus
 }
