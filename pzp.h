@@ -14,16 +14,13 @@ extern "C"
 #include <zstd.h>
 //sudo apt install libzstd-dev
 
-
-
-#define CHUNK_SIZE 16384
-
-#define PZP_VERBOSE 1
-
-#define PRINT_COMMENTS 0
 #define PPMREADBUFLEN 256
 
+#define PZP_VERBOSE 1
+#define PRINT_COMMENTS 0
 
+
+static const char pzp_version[]="v0.0";
 static const char pzp_header[4]={"PZP0"};
 
 static const int headerSize =  sizeof(unsigned int) * 8; //header, width,height,bitsperpixel,channels, internalbitsperpixel, internalchannels, checksum
