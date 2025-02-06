@@ -18,10 +18,13 @@ extern "C"
 
 #define CHUNK_SIZE 16384
 
+#define PZP_VERBOSE 1
+
 #define PRINT_COMMENTS 0
 #define PPMREADBUFLEN 256
 
-const char header[4]={"PZP0"};
+
+static const char pzp_header[4]={"PZP0"};
 
 static const int headerSize =  sizeof(unsigned int) * 8; //header, width,height,bitsperpixel,channels, internalbitsperpixel, internalchannels, checksum
 
@@ -31,6 +34,12 @@ static unsigned int convert_header(const char header[4])
            ((unsigned int)header[1] << 16) |
            ((unsigned int)header[2] << 8)  |
            ((unsigned int)header[3]);
+}
+
+static void fail(const char * message)
+{
+  fprintf(stderr,"PZP Fatal Error: %s\n",message);
+  exit(EXIT_FAILURE);
 }
 
 static unsigned int simplePowPPM(unsigned int base,unsigned int exp)
@@ -374,8 +383,7 @@ static void compress_combined(unsigned char **buffers,
     FILE *output = fopen(output_filename, "wb");
     if (!output)
     {
-        perror("File error");
-        exit(EXIT_FAILURE);
+        fail("File error");
     }
 
     unsigned int combined_buffer_size = (width * height * (bitsperpixelInternal/8)* channelsInternal) + headerSize;
@@ -383,21 +391,19 @@ static void compress_combined(unsigned char **buffers,
     unsigned int dataSize = combined_buffer_size;       //width * height;
     fwrite(&dataSize, sizeof(unsigned int), 1, output); // Store size for decompression
 
-    printf("Write size: %d bytes (including header)\n", dataSize);
+    printf("Write size: %d bytes\n", dataSize);
 
     size_t max_compressed_size = ZSTD_compressBound(combined_buffer_size);
     void *compressed_buffer = malloc(max_compressed_size);
     if (!compressed_buffer)
     {
-        perror("Memory allocation failed");
-        exit(EXIT_FAILURE);
+        fail("Memory allocation failed");
     }
 
     unsigned char *combined_buffer_raw = (unsigned char *) malloc(combined_buffer_size);
     if (!combined_buffer_raw)
     {
-        perror("Memory allocation failed");
-        exit(EXIT_FAILURE);
+        fail("Memory allocation failed");
     }
 
     // Store header information
@@ -415,7 +421,7 @@ static void compress_combined(unsigned char **buffers,
     //---------------------------------------------------------------------------------------------------
 
     //Store data to their target location
-    *headerTarget       = convert_header(header);
+    *headerTarget       = convert_header(pzp_header);
     *bitsperpixelTarget = bitsperpixelExternal;
     *channelsTarget     = channelsExternal;
     *widthTarget        = width;
@@ -436,9 +442,11 @@ static void compress_combined(unsigned char **buffers,
     //Calculate the checksum of the combined buffer
     *checksumTarget = hash_checksum(combined_buffer,width*height*channelsInternal);
 
-    fprintf(stderr, "Storing %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExternal, channelsExternal);
-    fprintf(stderr, "%u In:bitsperpixel / %u In:channels ",bitsperpixelInternal, channelsInternal);
-    fprintf(stderr, " / 0x%X checksum \n",*checksumTarget);
+    #if PZP_VERBOSE
+    fprintf(stderr, "Storing %ux%ux%u@%ubit/",width,height,channelsExternal,bitsperpixelExternal);
+    fprintf(stderr, "%u@%ubit",channelsInternal,bitsperpixelInternal);
+    fprintf(stderr, " | 0x%X checksum \n",*checksumTarget);
+    #endif // PZP_VERBOSE
 
 
     size_t compressed_size = ZSTD_compress(compressed_buffer, max_compressed_size, combined_buffer_raw, combined_buffer_size, 1);
@@ -447,7 +455,10 @@ static void compress_combined(unsigned char **buffers,
         fprintf(stderr, "Zstd compression error: %s\n", ZSTD_getErrorName(compressed_size));
         exit(EXIT_FAILURE);
     }
-    printf("Compression Ratio : %0.2f\n", (float) dataSize/compressed_size);
+
+    #if PZP_VERBOSE
+    fprintf(stderr,"Compression Ratio : %0.2f\n", (float) dataSize/compressed_size);
+    #endif // PZP_VERBOSE
 
     fwrite(compressed_buffer, 1, compressed_size, output);
 
@@ -465,8 +476,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     FILE *input = fopen(input_filename, "rb");
     if (!input)
     {
-        perror("File error");
-        exit(EXIT_FAILURE);
+        fail("File error");
     }
 
     // Read stored size
@@ -478,7 +488,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
         fprintf(stderr, "Error: Invalid size read from file (%d)\n", dataSize);
         exit(EXIT_FAILURE);
     }
-    printf("Read size: %d bytes (including header)\n", dataSize);
+    printf("Read size: %d bytes\n", dataSize);
 
     // Read compressed data
     fseek(input, 0, SEEK_END);
@@ -488,8 +498,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     void *compressed_buffer = malloc(compressed_size);
     if (!compressed_buffer)
     {
-        perror("Memory allocation #1 failed");
-        exit(EXIT_FAILURE);
+        fail("Memory allocation #1 failed");
     }
 
     fread(compressed_buffer, 1, compressed_size, input);
@@ -500,15 +509,14 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     void *decompressed_buffer = malloc(decompressed_size);
     if (!decompressed_buffer)
     {
-        perror("Memory allocation #2 failed");
-        exit(EXIT_FAILURE);
+        fail("Memory allocation #2 failed");
     }
 
     size_t actual_decompressed_size = ZSTD_decompress(decompressed_buffer, decompressed_size, compressed_buffer, compressed_size);
     if (ZSTD_isError(actual_decompressed_size))
     {
         fprintf(stderr, "Zstd decompression error: %s\n", ZSTD_getErrorName(actual_decompressed_size));
-        exit(EXIT_FAILURE);
+        fail("Decompression Error");
     }
 
     free(compressed_buffer);
@@ -516,7 +524,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     if (actual_decompressed_size!=decompressed_size)
     {
       fprintf(stderr, "Actual Decompressed size %lu mismatch with Decompressed size %lu \n", actual_decompressed_size, decompressed_size);
-      exit(EXIT_FAILURE);
+      fail("Decompression Error");
     }
 
 
@@ -542,10 +550,17 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     unsigned int bitsperpixelIn  = *bitsperpixelInSource;
     unsigned int channelsIn      = *channelsInSource;
 
+    #if PZP_VERBOSE
+    fprintf(stderr, "Detected %ux%ux%u@%ubit/",width,height,channelsExt,bitsperpixelExt);
+    fprintf(stderr, "%u@%ubit",channelsIn,bitsperpixelIn);
+    fprintf(stderr, " | 0x%X checksum \n",*checksumSource);
+    #endif // PZP_VERBOSE
 
-    fprintf(stderr, "Detected %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExt, channelsExt);
-    fprintf(stderr, "%u In:bitsperpixel / %u In:channels  ",bitsperpixelIn, channelsIn);
-    fprintf(stderr, " / 0x%X checksum \n",*checksumSource);
+    unsigned int runtimeVersion = convert_header(pzp_header);
+    if (runtimeVersion!=*headerSource)
+    {
+        fail("PZP version mismatch stopping to ensure consistency..");
+    }
 
     //Move from our local variables to function output
     *bitsperpixelExternalOutput = bitsperpixelExt;
@@ -559,8 +574,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     *buffers = (unsigned char **) malloc(channelsIn * sizeof(unsigned char *));
     if (!*buffers)
     {
-        perror("Memory allocation failed");
-        exit(EXIT_FAILURE);
+        fail("Memory allocation failed");
     }
 
     for (unsigned int ch = 0; ch < channelsIn; ch++)
@@ -568,8 +582,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
         (*buffers)[ch] = (unsigned char *) malloc(dataSize);
         if (!(*buffers)[ch])
         {
-            perror("Memory allocation failed");
-            exit(EXIT_FAILURE);
+            fail("Memory allocation failed");
         }
     }
 
