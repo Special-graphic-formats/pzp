@@ -21,7 +21,17 @@ extern "C"
 #define PRINT_COMMENTS 0
 #define PPMREADBUFLEN 256
 
-static const int headerSize = sizeof(unsigned int) * 6; //width,height,bitsperpixel,channels, internalbitsperpixel, internalchannels
+const char header[4]={"PZP0"};
+
+static const int headerSize =  sizeof(unsigned int) * 8; //header, width,height,bitsperpixel,channels, internalbitsperpixel, internalchannels, checksum
+
+static unsigned int convert_header(const char header[4])
+{
+    return ((unsigned int)header[0] << 24) |
+           ((unsigned int)header[1] << 16) |
+           ((unsigned int)header[2] << 8)  |
+           ((unsigned int)header[3]);
+}
 
 static unsigned int simplePowPPM(unsigned int base,unsigned int exp)
 {
@@ -295,6 +305,31 @@ static int WritePNM(const char * filename, unsigned char * pixels, unsigned int 
     return 0;
 }
 
+
+static unsigned int hash_checksum(const void *data, size_t dataSize)
+{
+    const unsigned char *bytes = (const unsigned char *)data;
+    unsigned int h1 = 0x12345678, h2 = 0x9ABCDEF0, h3 = 0xFEDCBA98, h4 = 0x87654321;
+
+    while (dataSize >= 4) {
+        h1 = (h1 ^ bytes[0]) * 31;
+        h2 = (h2 ^ bytes[1]) * 37;
+        h3 = (h3 ^ bytes[2]) * 41;
+        h4 = (h4 ^ bytes[3]) * 43;
+        bytes += 4;
+        dataSize -= 4;
+    }
+
+    // Process remaining bytes
+    if (dataSize > 0) h1 = (h1 ^ bytes[0]) * 31;
+    if (dataSize > 1) h2 = (h2 ^ bytes[1]) * 37;
+    if (dataSize > 2) h3 = (h3 ^ bytes[2]) * 41;
+
+    // Final mix to spread entropy
+    return (h1 ^ (h2 >> 3)) + (h3 ^ (h4 << 5));
+}
+
+
 static void split_channels_and_filter(const unsigned char *image, unsigned char **buffers, int num_buffers, int WIDTH, int HEIGHT)
 {
     int total_size = WIDTH * HEIGHT;
@@ -366,14 +401,21 @@ static void compress_combined(unsigned char **buffers,
     }
 
     // Store header information
-    unsigned int *bitsperpixelTarget  = (unsigned int*) combined_buffer_raw;
-    unsigned int *channelsTarget      = bitsperpixelTarget + 1; // Move by 1, not sizeof(unsigned int)
-    unsigned int *widthTarget         = bitsperpixelTarget + 2; // Move by 1, not sizeof(unsigned int)
-    unsigned int *heightTarget        = bitsperpixelTarget + 3; // Move by 1, not sizeof(unsigned int)
-    unsigned int *bitsperpixelInternalTarget = bitsperpixelTarget + 4; // Move by 1, not sizeof(unsigned int)
-    unsigned int *channelsInternalTarget     = bitsperpixelTarget + 5; // Move by 1, not sizeof(unsigned int)
+    //---------------------------------------------------------------------------------------------------
+    unsigned int *memStartAsUINT             = (unsigned int*) combined_buffer_raw;
+    //---------------------------------------------------------------------------------------------------
+    unsigned int *headerTarget               = memStartAsUINT + 0; // Move by 1, not sizeof(unsigned int)
+    unsigned int *bitsperpixelTarget         = memStartAsUINT + 1; // Move by 1, not sizeof(unsigned int)
+    unsigned int *channelsTarget             = memStartAsUINT + 2; // Move by 1, not sizeof(unsigned int)
+    unsigned int *widthTarget                = memStartAsUINT + 3; // Move by 1, not sizeof(unsigned int)
+    unsigned int *heightTarget               = memStartAsUINT + 4; // Move by 1, not sizeof(unsigned int)
+    unsigned int *bitsperpixelInternalTarget = memStartAsUINT + 5; // Move by 1, not sizeof(unsigned int)
+    unsigned int *channelsInternalTarget     = memStartAsUINT + 6; // Move by 1, not sizeof(unsigned int)
+    unsigned int *checksumTarget             = memStartAsUINT + 7; // Move by 1, not sizeof(unsigned int)
+    //---------------------------------------------------------------------------------------------------
 
     //Store data to their target location
+    *headerTarget       = convert_header(header);
     *bitsperpixelTarget = bitsperpixelExternal;
     *channelsTarget     = channelsExternal;
     *widthTarget        = width;
@@ -384,6 +426,7 @@ static void compress_combined(unsigned char **buffers,
     fprintf(stderr, "Storing %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExternal, channelsExternal);
     fprintf(stderr, "%u In:bitsperpixel / %u In:channels \n",bitsperpixelInternal, channelsInternal);
 
+
     // Store separate image planes
     unsigned char *combined_buffer = combined_buffer_raw + headerSize;
     for (int i = 0; i < width*height; i++)
@@ -393,6 +436,9 @@ static void compress_combined(unsigned char **buffers,
             combined_buffer[i * channelsInternal + ch] = buffers[ch][i];
         }
     }
+
+
+    *checksumTarget = hash_checksum(combined_buffer,width*height*channelsInternal);
 
     size_t compressed_size = ZSTD_compress(compressed_buffer, max_compressed_size, combined_buffer_raw, combined_buffer_size, 1);
     if (ZSTD_isError(compressed_size))
@@ -474,13 +520,18 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
 
     // Read header information
+    //---------------------------------------------------------------------------------------------------
     unsigned int *memStartAsUINT = (unsigned int *) decompressed_buffer;
-    unsigned int *bitsperpixelExtSource = memStartAsUINT + 0;
-    unsigned int *channelsExtSource     = memStartAsUINT + 1; // Move by 1, not sizeof(unsigned int)
-    unsigned int *widthSource           = memStartAsUINT + 2; // Move by 1, not sizeof(unsigned int)
-    unsigned int *heightSource          = memStartAsUINT + 3; // Move by 1, not sizeof(unsigned int)
-    unsigned int *bitsperpixelInSource  = memStartAsUINT + 4;
-    unsigned int *channelsInSource      = memStartAsUINT + 5; // Move by 1, not sizeof(unsigned int)
+    //---------------------------------------------------------------------------------------------------
+    unsigned int *headerSource          = memStartAsUINT + 0;
+    unsigned int *bitsperpixelExtSource = memStartAsUINT + 1; // Move by 1, not sizeof(unsigned int)
+    unsigned int *channelsExtSource     = memStartAsUINT + 2; // Move by 1, not sizeof(unsigned int)
+    unsigned int *widthSource           = memStartAsUINT + 3; // Move by 1, not sizeof(unsigned int)
+    unsigned int *heightSource          = memStartAsUINT + 4; // Move by 1, not sizeof(unsigned int)
+    unsigned int *bitsperpixelInSource  = memStartAsUINT + 5; // Move by 1, not sizeof(unsigned int)
+    unsigned int *channelsInSource      = memStartAsUINT + 6; // Move by 1, not sizeof(unsigned int)
+    unsigned int *checksumSource        = memStartAsUINT + 7; // Move by 1, not sizeof(unsigned int)
+    //---------------------------------------------------------------------------------------------------
 
     //Move from ampped header memory to our local variables
     unsigned int bitsperpixelExt = *bitsperpixelExtSource;
@@ -492,9 +543,8 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 
 
     fprintf(stderr, "Detected %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExt, channelsExt);
-    fprintf(stderr, "%u In:bitsperpixel / %u In:channels \n",bitsperpixelIn, channelsIn);
-
-    //bitsperpixel *= channels; //This is needed because of what writePNM expects..
+    fprintf(stderr, "%u In:bitsperpixel / %u In:channels  ",bitsperpixelIn, channelsIn);
+    fprintf(stderr, " / %u checksum \n",*checksumSource);
 
     //Move from our local variables to function output
     *bitsperpixelExternalOutput = bitsperpixelExt;
