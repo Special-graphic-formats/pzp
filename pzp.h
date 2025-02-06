@@ -423,9 +423,7 @@ static void compress_combined(unsigned char **buffers,
     *bitsperpixelInternalTarget = bitsperpixelInternal;
     *channelsInternalTarget     = channelsInternal;
 
-
-
-    // Store separate image planes
+    // Store separate image planes so that they get better compressed :P
     unsigned char *combined_buffer = combined_buffer_raw + headerSize;
     for (int i = 0; i < width*height; i++)
     {
@@ -435,6 +433,7 @@ static void compress_combined(unsigned char **buffers,
         }
     }
 
+    //Calculate the checksum of the combined buffer
     *checksumTarget = hash_checksum(combined_buffer,width*height*channelsInternal);
 
     fprintf(stderr, "Storing %ux%u / %u Ext:bitsperpixel / %u Ext:channels / ",width,height, bitsperpixelExternal, channelsExternal);
