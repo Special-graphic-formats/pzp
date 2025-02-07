@@ -29,7 +29,7 @@ for file in "$INPUT_DIR"/*.{jpg,jpeg,png,bmp,tiff,tif}; do
     echo "Converting $file"
 
     # Convert image to temporary PNM format
-    convert "$file" temporary.pnm    
+    convert "$file" temporary.ppm    
     if [ $? -ne 0 ]; then
         echo "Error: Failed to convert $file to PNM format"
         exit 3

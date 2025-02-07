@@ -335,7 +335,8 @@ static unsigned int hash_checksum(const void *data, size_t dataSize)
     const unsigned char *bytes = (const unsigned char *)data;
     unsigned int h1 = 0x12345678, h2 = 0x9ABCDEF0, h3 = 0xFEDCBA98, h4 = 0x87654321;
 
-    while (dataSize >= 4) {
+    while (dataSize >= 4)
+    {
         h1 = (h1 ^ bytes[0]) * 31;
         h2 = (h2 ^ bytes[1]) * 37;
         h3 = (h3 ^ bytes[2]) * 41;
