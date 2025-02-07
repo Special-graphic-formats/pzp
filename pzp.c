@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 
     if (strcmp(operation, "compress") == 0)
     {
-        fprintf(stderr, "Compress %s \n", input_commandline_parameter);
+        fprintf(stderr, "Openning %s:", input_commandline_parameter);
 
         unsigned char *image = NULL;
         unsigned int width = 0, height = 0, bytesPerPixel = 0, channels = 0, bitsperpixelInternal = 0, channelsInternal=0;
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 
         image = ReadPNM(0, input_commandline_parameter, &width, &height, &timestamp, &bytesPerPixel, &channels);
         unsigned int bitsperpixel = bytesPerPixel * 8;
-        fprintf(stderr, "Width %u / Height %u / bitsperpixel %u / channels %u \n", width, height, bitsperpixel, channels);
+        fprintf(stderr, "%ux%ux%u@%ubit \n", width, height, channels, bitsperpixel);
 
         bitsperpixelInternal = bitsperpixel;
         channelsInternal     = channels;

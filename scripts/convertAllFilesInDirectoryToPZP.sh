@@ -27,11 +27,20 @@ for file in "$INPUT_DIR"/*.{jpg,jpeg,png,bmp,tiff,tif}; do
     FILENAME_NO_EXT="${FILENAME%.*}"
     
     # Convert image to temporary PNM format
-    convert "$file" temporary.pnm
-    
+    convert "$file" temporary.pnm    
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to convert $file to PNM format"
+        exit 3
+    fi
+
     # Compress using pzp
     ./pzp compress temporary.pnm "$OUTPUT_DIR/$FILENAME_NO_EXT.pzp"
-    
+    if [ $? -ne 0 ]; then
+        echo "Error: pzp compression failed for $file"
+        exit 4
+    fi
+
+
     # Remove temporary file
     rm -f temporary.pnm
 

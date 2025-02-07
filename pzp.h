@@ -406,7 +406,7 @@ static void compress_combined(unsigned char **buffers,
     unsigned int dataSize = combined_buffer_size;       //width * height;
     fwrite(&dataSize, sizeof(unsigned int), 1, output); // Store size for decompression
 
-    printf("Write size: %d bytes\n", dataSize);
+    //printf("Write size: %d bytes\n", dataSize);
 
     size_t max_compressed_size = ZSTD_compressBound(combined_buffer_size);
     void *compressed_buffer = malloc(max_compressed_size);
@@ -460,7 +460,7 @@ static void compress_combined(unsigned char **buffers,
     #if PZP_VERBOSE
     fprintf(stderr, "Storing %ux%ux%u@%ubit/",width,height,channelsExternal,bitsperpixelExternal);
     fprintf(stderr, "%u@%ubit",channelsInternal,bitsperpixelInternal);
-    fprintf(stderr, " | 0x%X checksum \n",*checksumTarget);
+    fprintf(stderr, " | CRC:0x%X\n",*checksumTarget);
     #endif // PZP_VERBOSE
 
 
@@ -507,7 +507,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
         fprintf(stderr, "Error: Invalid size read from file (%d)\n", dataSize);
         exit(EXIT_FAILURE);
     }
-    printf("Read size: %d bytes\n", dataSize);
+    //printf("Read size: %d bytes\n", dataSize);
 
     // Read compressed data
     if (fseek(input, 0, SEEK_END) != 0)
@@ -596,7 +596,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
 #if PZP_VERBOSE
     fprintf(stderr, "Detected %ux%ux%u@%ubit/", width, height, channelsExt, bitsperpixelExt);
     fprintf(stderr, "%u@%ubit", channelsIn, bitsperpixelIn);
-    fprintf(stderr, " | 0x%X checksum \n", *checksumSource);
+    fprintf(stderr, " | CRC:0x%X\n", *checksumSource);
 #endif
 
     unsigned int runtimeVersion = convert_header(pzp_header);
