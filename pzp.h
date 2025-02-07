@@ -468,7 +468,7 @@ static void compress_combined(unsigned char **buffers,
     if (ZSTD_isError(compressed_size))
     {
         fprintf(stderr, "Zstd compression error: %s\n", ZSTD_getErrorName(compressed_size));
-        exit(EXIT_FAILURE);
+        fail("Zstd compression error");
     }
 
     #if PZP_VERBOSE
@@ -505,7 +505,7 @@ static void decompress_combined(const char *input_filename, unsigned char ***buf
     {
         fclose(input);
         fprintf(stderr, "Error: Invalid size read from file (%d)\n", dataSize);
-        exit(EXIT_FAILURE);
+        fail("Error: Invalid size read from file");
     }
     //printf("Read size: %d bytes\n", dataSize);
 

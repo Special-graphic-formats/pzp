@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 
     if (strcmp(operation, "compress") == 0)
     {
-        fprintf(stderr, "Openning %s:", input_commandline_parameter);
+        fprintf(stderr, "Opening %s:", input_commandline_parameter);
 
         unsigned char *image = NULL;
         unsigned int width = 0, height = 0, bytesPerPixel = 0, channels = 0, bitsperpixelInternal = 0, channelsInternal=0;
@@ -65,6 +65,7 @@ int main(int argc, char *argv[])
           free(buffers);
          }
         }//If we have an image
+        else{ return EXIT_FAILURE; }
     }
     else if (strcmp(operation, "decompress") == 0)
     {
