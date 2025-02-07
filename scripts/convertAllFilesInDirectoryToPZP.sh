@@ -36,7 +36,7 @@ for file in "$INPUT_DIR"/*.{jpg,jpeg,png,bmp,tiff,tif}; do
     fi
 
     # Compress using pzp
-    ./pzp compress temporary.pnm "$OUTPUT_DIR/$FILENAME_NO_EXT.pzp"
+    ./pzp compress temporary.ppm "$OUTPUT_DIR/$FILENAME_NO_EXT.pzp"
     if [ $? -ne 0 ]; then
         echo "Error: pzp compression failed for $file"
         exit 4
@@ -44,8 +44,11 @@ for file in "$INPUT_DIR"/*.{jpg,jpeg,png,bmp,tiff,tif}; do
 
 
     # Remove temporary file
-    rm -f temporary.pnm
+    rm -f temporary.ppm
 
 done
 
 echo "Processing complete."
+
+scripts/checkParity.sh $1 $2
+exit 0
