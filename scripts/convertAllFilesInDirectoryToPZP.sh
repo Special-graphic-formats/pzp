@@ -26,6 +26,8 @@ for file in "$INPUT_DIR"/*.{jpg,jpeg,png,bmp,tiff,tif}; do
     FILENAME=$(basename -- "$file")
     FILENAME_NO_EXT="${FILENAME%.*}"
     
+    echo "Converting $file"
+
     # Convert image to temporary PNM format
     convert "$file" temporary.pnm    
     if [ $? -ne 0 ]; then
